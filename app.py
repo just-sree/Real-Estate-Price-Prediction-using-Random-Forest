@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import logging
 
 from src.data_processing import load_data
 from src.preprocessing import preprocess_data
@@ -10,7 +11,7 @@ from src.model_evaluation import evaluate_model
 
 st.title("🏡 Real Estate Price Prediction & Visualizations")
 
-# Load dataset from the repository
+# Load dataset from the repo (final.csv)
 df = load_data("final.csv")
 if df is None:
     st.error("Error loading dataset.")
@@ -20,9 +21,23 @@ else:
 
     # Preprocess the data and train the model
     df_processed = preprocess_data(df.copy())
-    X_train, X_test, y_train, y_test = split_data(df_processed, "price")  # using lowercase "price"
-    model = train_model(X_train, y_train)
-    mae, mse = evaluate_model(model, X_test, y_test)
+    try:
+        X_train, X_test, y_train, y_test = split_data(df_processed, "price")  # using lowercase "price"
+    except Exception as e:
+        st.error("Error splitting data: " + str(e))
+        st.stop()
+    
+    try:
+        model = train_model(X_train, y_train)
+    except Exception as e:
+        st.error("Error training model: " + str(e))
+        st.stop()
+
+    try:
+        mae, mse = evaluate_model(model, X_test, y_test)
+    except Exception as e:
+        st.error("Error evaluating model: " + str(e))
+        st.stop()
 
     st.write("### Model Evaluation")
     st.write(f"**MAE:** {mae}")
@@ -42,7 +57,7 @@ else:
     st.write("### Predict a Property Price")
     with st.form("predict_form"):
         st.subheader("Enter Property Details")
-        # Dropdown for each numeric input using the dataset options.
+        # Dropdowns for each numeric parameter
         default_year_sold = 2007
         idx = year_sold_options.index(default_year_sold) if default_year_sold in year_sold_options else 0
         year_sold = st.selectbox("Year Sold", options=year_sold_options, index=idx)
@@ -79,7 +94,7 @@ else:
         idx = property_age_options.index(default_property_age) if default_property_age in property_age_options else 0
         property_age = st.selectbox("Property Age", options=property_age_options, index=idx)
         
-        # Dropdowns for binary/categorical variables (already dropdowns)
+        # Dropdowns for binary/categorical variables
         basement = st.selectbox("Basement (0 = No, 1 = Yes)", options=[0, 1])
         popular = st.selectbox("Popular (0 = No, 1 = Yes)", options=[0, 1])
         recession = st.selectbox("Recession (0 = No, 1 = Yes)", options=[0, 1])
@@ -88,7 +103,7 @@ else:
         submitted = st.form_submit_button("Predict Price")
     
     if submitted:
-        # Create a dictionary for the user input
+        # Create dictionary for user input
         input_dict = {
             "year_sold": year_sold,
             "property_tax": property_tax,
@@ -103,7 +118,7 @@ else:
             "recession": recession,
             "property_age": property_age,
         }
-        # Create dummy variables for property type based on user selection
+        # Create dummy variables for property type
         if property_type == "Bunglow":
             input_dict["property_type_Bunglow"] = 1
             input_dict["property_type_Condo"] = 0
@@ -111,19 +126,21 @@ else:
             input_dict["property_type_Bunglow"] = 0
             input_dict["property_type_Condo"] = 1
 
-        # Convert the dictionary to a DataFrame
+        # Convert dictionary to DataFrame
         input_df = pd.DataFrame([input_dict])
-        # Ensure the input DataFrame has the same columns as the training data
         input_df = input_df.reindex(columns=X_train.columns, fill_value=0)
 
         # Generate prediction
-        prediction = model.predict(input_df)[0]
-        st.write("### Predicted Price")
-        st.write(f"${prediction:,.2f}")
-
+        try:
+            prediction = model.predict(input_df)[0]
+            st.write("### Predicted Price")
+            st.write(f"${prediction:,.2f}")
+        except Exception as e:
+            st.error("Error generating prediction: " + str(e))
+        
         st.write("### Visualizations with Prediction Marker")
         
-        # Visualization 1: Distribution of 'price' with predicted price marker
+        # Visualization 1: Price Distribution with predicted price marker
         st.write("#### Distribution of Price")
         plt.figure()
         plt.hist(df["price"], bins=30, edgecolor='black')
@@ -134,7 +151,7 @@ else:
         plt.legend()
         st.pyplot(plt.gcf())
         
-        # Visualization 2: Scatter Plot between 'sqft' and 'price' with the input point highlighted
+        # Visualization 2: Scatter Plot (sqft vs. price) with input point highlighted
         st.write("#### Scatter Plot: Sqft vs Price")
         plt.figure()
         plt.scatter(df["sqft"], df["price"], alpha=0.5, label="Data Points")
