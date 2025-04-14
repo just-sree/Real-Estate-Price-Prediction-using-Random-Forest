@@ -9,7 +9,7 @@ import logging
 
 def main():
     # Load dataset
-    df = load_data("final.csv")
+    df = load_data(r"D:\Personal Projects\Real-Estate-Price-Prediction-using-Random-Forest\data\final.csv")
     if df is None:
         logging.error("Dataset could not be loaded. Exiting.")
         return
